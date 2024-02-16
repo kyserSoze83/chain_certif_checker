@@ -15,21 +15,23 @@ def initCertif(certificat_format, certificat_path):
         with open(certificat_path, "rb") as f:
             cert_data = f.read()
 
-        print("File readed !")
-
         # Charger le certificat
         if certificat_format == 0:
             cert = x509.load_pem_x509_certificate(cert_data, default_backend())
         else:
             cert = x509.load_der_x509_certificate(cert_data, default_backend())
 
-        print("Certificate loaded !")
-
         # Numéro de série
         certificat_obj.id = cert.serial_number
 
         # Algorithme de chiffrement et fonction de hachage
-        certificat_obj.signAlgo = cert.signature_algorithm_oid
+        certificat_obj.signAlgo = cert.signature_hash_algorithm
+
+        # Signature
+        certificat_obj.sign = cert.signature
+
+        # TBS
+        certificat_obj.tbs = cert.tbs_certificate_bytes
 
         # Dates de validité
         certificat_obj.dateBefore = cert.not_valid_before_utc
@@ -43,19 +45,18 @@ def initCertif(certificat_format, certificat_path):
         certificat_obj.kpub = cert.public_key()
 
         # KeyUsage
-        certificat_obj.extensions = cert.extensions
+        extensions = cert.extensions
         certificat_obj.keyUsage = None
 
-        print("Certificate informations loaded ! (before keyUsage)")
-
-        for ext in certificat_obj.extensions:
+        for ext in extensions:
             if isinstance(ext.value, x509.KeyUsage):
                 certificat_obj.keyUsage = ext.value
                 break
-    
+
         certificat_obj.print()
     except:
-        print("Error while loading certificate...")
         return None
+    
+    certificat_obj.valid = certificat_obj.checkSign()
 
     return certificat_obj
