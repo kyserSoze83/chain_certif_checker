@@ -75,7 +75,7 @@ class certificat:
         self.signAlgo = None
         self.cypherAlgo = None
         self.sign = None
-        self.tbs = None
+        self.tbs=None
         self.dateBefore = None
         self.dateAfter = None
         self.expired = False
