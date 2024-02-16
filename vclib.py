@@ -30,10 +30,6 @@ class certificat:
 def checkArgs(args):
     return True
 
-def initCertif(certificat_format, certificat_path):
-    certificat_obj = certificat()
-    return certificat_obj
-
 def displayJson(certificat_obj):
     if certificat_obj == None:
         pass # Afficher l'invalidité (erreur)
