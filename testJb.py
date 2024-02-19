@@ -8,7 +8,12 @@ import vclib
 import fjb
 
 def main():
-    certificat_obj = fjb.initCertif(0, "./certs/educ.isen-mediterranee.fr.crt") # Générer un objet certificat
+    check=vclib.checkArgs()
+    print("check : ", check)
+    if check==-1:
+        return -1
+    certificat_obj = vclib.initCertif(check[0], check[1]) # Générer un objet certificat
+    print(certificat_obj)
 
     if certificat_obj == None:
         print("Certificat file is invalid...")

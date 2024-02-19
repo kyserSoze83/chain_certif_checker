@@ -1,4 +1,5 @@
 import os
+import sys
 # from asn1crypto import pem
 # def est_format_der(certificat):
 #     # Vérifier si le certificat est au format DER
@@ -17,32 +18,30 @@ import os
 #         return False
     
     
-def checkArgs(tab):
-    if len(tab)!=3:
+def checkArgs():
+    if len(sys.argv)-1 !=3:
         return -1
-    if tab[0]!="-format":
-        print(tab[0])
+    if sys.argv[1]!="-format":
+        print(sys.argv[1])
         return -1
-    if tab[1]!= "DER" and tab[1]!= "PEM":
-        print(tab[1])
+    if sys.argv[2]!= "DER" and sys.argv[2]!= "PEM":
+        print(sys.argv[2])
         return -1
-    if os.path.exists(tab[2]) == False:
-        print(tab[2])
+    if os.path.exists(sys.argv[3]) == False:
+        print(sys.argv[3])
         return -1
     #si le format est PEM on renvoie 0, si c'est DER on renvoie 1
     with open("/home/nabil/documents/certif.der", "rb") as f:
         certificat = f.read()
-    if tab[1]== "DER":
+    if sys.argv[2]== "DER":
         format = 1
-    elif tab[1]== "PEM":
+    elif sys.argv[2]== "PEM":
         format = 0
     else:
         print("Format de certificat non reconnu.")
-        print(tab[2])
+        print(sys.argv[3])
         return -1
   
-    info=[format,tab[2]]
+    info=[format,sys.argv[3]]
     return info
 
-test=["-format","DER","/home/nabil/documents/chain_certif_checker/certs/educ.isen-mediterranee.fr.crt"]
-print(checkArgs(test))

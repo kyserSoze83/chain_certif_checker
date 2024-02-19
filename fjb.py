@@ -14,6 +14,7 @@ def initCertif(certificat_format, certificat_path):
     try:
         with open(certificat_path, "rb") as f:
             cert_data = f.read()
+            print("Fichier : ", cert_data)
 
         # Charger le certificat
         if certificat_format == 0:
@@ -23,26 +24,46 @@ def initCertif(certificat_format, certificat_path):
 
         # Numéro de série
         certificat_obj.id = cert.serial_number
+        print("ID du certif : ",certificat_obj.id)
+        print("\n")
 
         # Algorithme de chiffrement et fonction de hachage
         certificat_obj.signAlgo = cert.signature_hash_algorithm
+        print("algo de hash du certif : ",certificat_obj.signAlgo)
+        print("\n")
 
         # Signature
         certificat_obj.sign = cert.signature
+        print("Signature : ", certificat_obj.sign)
+        print("\n")
 
         # TBS
         certificat_obj.tbs = cert.tbs_certificate_bytes
+        print("TBS : ", certificat_obj.tbs)
+        print("\n")
 
         # Dates de validité
-        certificat_obj.dateBefore = cert.not_valid_before_utc
-        certificat_obj.dateAfter = cert.not_valid_after_utc
+        certificat_obj.dateBefore = cert.not_valid_before
+        certificat_obj.dateAfter = cert.not_valid_after
+        print("Date avant : ", certificat_obj.dateBefore)
+        print("\n")
+ 
+        print("Date après : ",certificat_obj.dateAfter)
+        print("\n")
 
         # Subject et Issuer
         certificat_obj.subject = cert.subject
         certificat_obj.issuer = cert.issuer
+        print("subject : ", certificat_obj.subject)
+        print("\n")
+
+        print("issuer : ",certificat_obj.issuer )
+        print("\n")
+
 
         # Clé publique
         certificat_obj.kpub = cert.public_key()
+        print("Kpub : ", certificat_obj.kpub)
 
         # KeyUsage
         extensions = cert.extensions
@@ -53,10 +74,10 @@ def initCertif(certificat_format, certificat_path):
                 certificat_obj.keyUsage = ext.value
                 break
 
-        certificat_obj.print()
     except:
         return None
     
     certificat_obj.valid = certificat_obj.checkSign()
+    certificat_obj.print()
 
     return certificat_obj

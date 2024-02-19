@@ -15,13 +15,13 @@ def main():
     certificat_obj = None
     
     # Vérifier les arguments et récupérer le format du certificat et le chemin vers le fichier:
-    certificat_args = checkArgs(args)
+    certificat_args = fnabil.checkArgs(args)
     if certificat_args == -1:
         print("Certificat format is invalid or file is missing...")
     else:
         certificat_format = certificat_args[0]
         certificat_path = certificat_args[1]
-        certificat_obj = initCertif(certificat_format, certificat_path) # Générer un objet certificat
+        certificat_obj = fjb.initCertif(certificat_format, certificat_path) # Générer un objet certificat
 
         if certificat_obj == None:
             print("Certificat file is invalid...")
