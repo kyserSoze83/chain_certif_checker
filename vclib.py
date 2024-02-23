@@ -33,20 +33,25 @@ class certificat:
     def checkSign(self):
         # Récupérer la clé publique du certificat
         cle_publique = self.kpub
-        #self.kpub
 
         # Vérifier la signature
-        cle_publique.verify(
-            self.sign,
-            self.tbs,
-            padding.PKCS1v15(),
-            self.signAlgo
-        )
-        return True
+        try:
+            cle_publique.verify(
+                self.sign,
+                self.tbs,
+                padding.PKCS1v15(),
+                self.signAlgo
+            )
+            self.valid = True
+            return True
+        except:
+            print("Signature is invalid...")
+        
+        return False
 
     def checkParam(self):
         return True
-    
+
     def print(self):
         print('---------------------------------')
         print('Format: ', self.format)
