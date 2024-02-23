@@ -8,10 +8,10 @@
 import os
 import sys
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography import x509 
+from datetime import datetime
 
 
 # ----------------- Class -----------------
@@ -43,20 +43,45 @@ class certificat:
                 self.sign,
                 self.tbs,
                 padding.PKCS1v15(),
-                #padding.PSS(
-                #   mgf=padding.MGF1(hashes.SHA256),
-                #  salt_length=padding.PSS.MAX_LENGTH
-                #),
                 self.signAlgo
-                #hashes.SHA256()
             )
+            print("Signature RSA valide")
             return True
         except:
-            print("Signature invalide")
+            print("Signature RSA invalide")
+        try:
+            cle_publique.verify(self.sign,
+                                self.tbs,
+                                ec.ECDSA(self.signAlgo))
+            print("Signature ECDSA valide")
+            return True
+        except:
+            print("Signature ECDSA invalide")
+        return False 
 
 
     def checkParam(self):
-        return True
+        # Récupérer la date actuelle
+        date_actuelle = datetime.now()
+        # ici on vérifie que la date actuelle se trouve bien après la date de début et avant la date de fin
+        if not (date_actuelle < self.dateAfter and date_actuelle > self.dateBefore):
+            print("La date du certificat est soit expirée soit pas encore effective")
+            return False
+        else:
+            #ici on vérifie que le sujet et l'emmeteur sont les mêmes
+            if not self.issuer==self.subject:
+                print("L'emmeteur et le sujet du certificat sont différents")
+                return False
+            else:
+                #ici on vérifie les usages de la clé qui a servi a signer le certificat (la clé ne doit pas servir à signer et à chiffrer à la fois)
+                if not (self.keyUsage.key_encipherment==False and self.keyUsage.data_encipherment==False and self.keyUsage.key_agreement==False and self.keyUsage.key_cert_sign==True and self.keyUsage.crl_sign==True):
+                    print("Les usages de la clé sont mauvais")
+                    return False
+                else:
+                    self.rca=True
+                    self.print()
+                    return True
+            
     
     def print(self):
         print('---------------------------------')
