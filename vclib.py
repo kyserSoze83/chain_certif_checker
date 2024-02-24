@@ -112,7 +112,7 @@ class certificat:
         key_usage_str = str(self.keyUsage)
 
         cert_json = {
-            "id": str(self.id),
+            "id": 0,
             "format": str(self.format),
             "crt_id": str(self.id),
             "signAlgo": sign_algo_str,
