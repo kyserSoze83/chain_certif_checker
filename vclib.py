@@ -17,6 +17,29 @@ from datetime import datetime
 
 
 # ----------------- Class -----------------
+class chain:
+    def __init__(self, _certs):
+        self.certs = _certs
+        self.isValid = False
+
+    def checkChain(self):
+        # Vérifier la validité de la chaîne
+        for i in range(len(self.certs)-1):
+            if self.certs[i].subject != self.certs[i+1].issuer:
+                return False
+
+        self.isValid = True
+        return True
+    
+    def displayJson(self):
+        chain_json = {
+            "id": 1,
+            "valid": str(self.isValid),
+        }
+
+        chain_json_str = json.dumps(chain_json, indent=4)
+        print(chain_json_str)
+
 class certificat:
     def __init__(self, _format, _path):
         self.format = _format
@@ -28,6 +51,7 @@ class certificat:
         self.dateBefore = None
         self.dateAfter = None
         self.expired = False
+        self.revoked = False
         self.subject = None
         self.issuer = None
         self.kpub = None
@@ -37,10 +61,19 @@ class certificat:
         self.isCA = False
         self.valid = False
 
+    def checkRevoke(self):
+        # self.revoked = False ...
+        pass
 
-    def checkSign(self):
+    def checkSignRSA(self, _kpub=None):
+        pass
+
+    def checkSign(self, _kpub=None):
         # Récupérer la clé publique du certificat
-        cle_publique = self.kpub
+        if _kpub != None:
+            cle_publique = _kpub
+        else:
+            cle_publique = self.kpub
 
         # Vérifier la signature
         try:
@@ -72,26 +105,35 @@ class certificat:
 
 
     def checkParam(self):
+        return_value = True
+
         # Récupérer la date actuelle
         date_actuelle = datetime.now()
 
         # ici on vérifie que la date actuelle se trouve bien après la date de début et avant la date de fin
         if not (date_actuelle < self.dateAfter and date_actuelle > self.dateBefore):
             self.expired = True
-            return False
-        else:
-            #ici on vérifie que le sujet et l'emmeteur sont les mêmes
-            if self.issuer == self.subject:
-                self.autoSign = True
-                if not self.isCA:
-                    return False
+            self.valid = False
+            return_value = False
 
-            #ici on vérifie les usages de la clé qui a servi a signer le certificat (la clé ne doit pas servir à signer et à chiffrer à la fois)
-            if not (self.keyUsage.key_encipherment==False and self.keyUsage.data_encipherment==False and self.keyUsage.key_agreement==False and self.keyUsage.key_cert_sign==True and self.keyUsage.crl_sign==True):
-                self.keyUsageValid = False
-                return False
+        #ici on vérifie que le sujet et l'emmeteur sont les mêmes
+        if self.issuer == self.subject:
+            self.autoSign = True
+            if not self.isCA:
+                self.valid = False
+                return_value = False
+
+        #ici on vérifie les usages de la clé qui a servi a signer le certificat (la clé ne doit pas servir à signer et à chiffrer à la fois)
+        if self.isCA and ( self.keyUsage == None or not (self.keyUsage.key_encipherment==False and self.keyUsage.data_encipherment==False and self.keyUsage.key_agreement==False and self.keyUsage.key_cert_sign==True and self.keyUsage.crl_sign==True) ):
+            self.keyUsageValid = False
+            self.valid = False
+            return_value = False
+        elif not self.isCA and ( self.keyUsage.key_cert_sign==True or self.keyUsage.crl_sign==True ):
+            self.keyUsageValid = False
+            self.valid = False
+            return_value = False
             
-        return True
+        return return_value
 
     def displayJson(self):
         sign_algo_str = str(self.signAlgo.name)
@@ -120,6 +162,7 @@ class certificat:
             "dateBefore": date_before_str,
             "dateAfter": date_after_str,
             "expired": str(self.expired),
+            "revoked": str(self.revoked),
             "subject": subject_str,
             "issuer": issuer_str,
             "kpub": kpub_pem,
@@ -135,24 +178,28 @@ class certificat:
 
 
 # ----------------- Functions -----------------
+def initChain(certs):
+    return chain(certs)
+
 def checkArgs():
-    if len(sys.argv)-1 !=3:
+    if len(sys.argv)-1 <3:
         return -1
     if sys.argv[1]!="-format":
         return -1
     if sys.argv[2]!= "DER" and sys.argv[2]!= "PEM":
         return -1
-    if os.path.exists(sys.argv[3]) == False:
-        return -1
-    #si le format est PEM on renvoie 0, si c'est DER on renvoie 1
+
     if sys.argv[2]== "DER":
         format = 1
     elif sys.argv[2]== "PEM":
         format = 0
     else:
         return -1
-  
-    info=[format,sys.argv[3]]
+    
+    info=[format]
+
+    for arg in sys.argv[3:]:
+        info.append(arg)
     return info
 
 
@@ -206,5 +253,4 @@ def initCertif(certificat_format, certificat_path):
     except:
         return None
     
-    certificat_obj.checkSign()
     return certificat_obj
