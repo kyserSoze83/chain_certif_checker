@@ -6,8 +6,16 @@
 
 import sys
 import vclib
-import fnabil
-import fjb
+import json
+
+def display_error(msg):
+    output_json = {
+        "id": -1,
+        "message": msg
+    }
+
+    output_json_str = json.dumps(output_json)
+    print(output_json_str)
 
 def main():
     arguments = sys.argv
@@ -15,27 +23,25 @@ def main():
     certificat_obj = None
     
     # Vérifier les arguments et récupérer le format du certificat et le chemin vers le fichier:
-    certificat_args = checkArgs(args)
+    certificat_args = vclib.checkArgs()
     if certificat_args == -1:
-        print("Certificat format is invalid or file is missing...")
+        display_error("Invalid arguments")
     else:
         certificat_format = certificat_args[0]
         certificat_path = certificat_args[1]
-        certificat_obj = initCertif(certificat_format, certificat_path) # Générer un objet certificat
+        certificat_obj = vclib.initCertif(certificat_format, certificat_path) # Générer un objet certificat
 
         if certificat_obj == None:
-            print("Certificat file is invalid...")
+            display_error("Certificat format is invalid...")
         else:
             # Vérifier la signature du certifcat:
-            if not certificat_obj.checkSign():
-                print("Certificat signature is invalid...")
-            else:
+            if certificat_obj.checkSign():
                 # Vérifier les paramètres du certificat:
                 if not certificat_obj.checkParam():
-                    print("Certificat parameters are invalid...")
+                    certificat_obj.valid = False
 
-    # Renvoyer le résultat de notre vérification au format JSON:
-    displayJson(certificat_obj)
+            # Renvoyer le résultat de notre vérification au format JSON:
+            certificat_obj.displayJson()
 
 if __name__ == '__main__':
     main()
