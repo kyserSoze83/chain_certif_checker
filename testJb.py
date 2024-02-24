@@ -16,12 +16,12 @@ def main():
         # Vérifier la signature du certifcat:
         if not certificat_obj.checkSign():
             print("Certificat signature is invalid...")
+        else:
+            print("Certificat signature is valid...")
         # else:
         #     # Vérifier les paramètres du certificat:
         #     if not certificat_obj.checkParam():
         #         print("Certificat parameters are invalid...")
-
-        certificat_obj.print()
 
 if __name__ == '__main__':
     main()

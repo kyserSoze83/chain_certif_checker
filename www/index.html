@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>validate-cert</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1 id="title">Certificate Validator</h1>
+    <h2 id="description">File accept: .cert, .crt, .pem</h2>
+
+    <input type="file" id="input_file" name="certificat_input" accept=".cert, .crt, .pem" style="display: none;"/>
+    <input type="button" value="Load a certificate" onclick="document.getElementById('input_file').click();" />
+
+    <footer>
+        <p>©Nabil & Jb, 2024</p>
+    </footer>
+</body>
+</html>
