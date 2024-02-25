@@ -28,6 +28,7 @@ def main():
         certificat_format = certificats_args[0]
         certificats_paths = certificats_args[1:]
         last_ca_kpub = None
+        last_issuer = None
 
         for cert_path in certificats_paths:
             certificat_obj = vclib.initCertif(certificat_format, cert_path) # Générer un objet certificat
@@ -38,16 +39,33 @@ def main():
                 break
             else:
                 # Vérifier la signature du certificat:
-                if certificat_obj.checkSign(last_ca_kpub):
+                check_sign_result = False
+
+                if certificat_obj.cypherAlgo == "RSA":
+                    check_sign_result = certificat_obj.checkSignRSA(last_ca_kpub)
+                elif certificat_obj.cypherAlgo == "ECDSA":
+                    check_sign_result = certificat_obj.checkSignEC(last_ca_kpub)
+                elif certificat_obj.cypherAlgo == "DSA":
+                    displayError(f"({cert_path}) DSA is not supported...")
+                    invalid_chain = True
+                    break
+
+                if check_sign_result:
                     # Vérifier les paramètres du certificat:
                     if not certificat_obj.checkParam():
                         displayError(f"({cert_path}) Certificat parameters are invalid...")
                         invalid_chain = True
                         break
                     else:
-                        if certificat_obj.isCA:
-                            last_ca_kpub = certificat_obj.kpub
-                        certs.append(certificat_obj)
+                        if last_issuer != None and certificat_obj.checkRevoke(last_issuer):
+                            displayError(f"({cert_path}) Certificat is revoked...")
+                            invalid_chain = True
+                            break
+                        else:
+                            if certificat_obj.isCA:
+                                last_issuer = certificat_obj
+                                last_ca_kpub = certificat_obj.kpub
+                            certs.append(certificat_obj)
                 else:
                     displayError(f"({cert_path}) Certificat signature is invalid...")
                     invalid_chain = True

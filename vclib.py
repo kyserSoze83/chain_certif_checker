@@ -5,16 +5,19 @@
 #
 
 # ----------------- Imports -----------------
-import os
 import sys
 import json
+import requests
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography import x509 
+from cryptography.x509 import ocsp
 from datetime import datetime
-
+from pyasn1.codec.der import decoder
+import binascii
 
 # ----------------- Class -----------------
 class chain:
@@ -42,15 +45,18 @@ class chain:
 
 class certificat:
     def __init__(self, _format, _path):
+        self.cert = None
         self.format = _format
         self.path = _path
         self.id = None
         self.signAlgo = None
+        self.cypherAlgo = None
         self.sign = None
         self.tbs = None
         self.dateBefore = None
         self.dateAfter = None
         self.expired = False
+        self.ocspUrls = None
         self.revoked = False
         self.subject = None
         self.issuer = None
@@ -61,12 +67,49 @@ class certificat:
         self.isCA = False
         self.valid = False
 
-    def checkRevoke(self):
-        # self.revoked = False ...
-        pass
+    def checkSignEC(self, _kpub=None):
+        return False
 
     def checkSignRSA(self, _kpub=None):
-        pass
+        # Récupérer la clé publique du certificat:
+        if _kpub != None:
+            cle_publique = _kpub
+        else:
+            cle_publique = self.kpub
+
+        # Récupérer la signature:
+        e = int(hex(cle_publique.public_numbers().e), 16) # Exposant
+        n = int(hex(cle_publique.public_numbers().n), 16) # Modulus
+        s = int(hex(int.from_bytes(self.sign, byteorder='big')), 16) # Signature
+
+        # Déchiffrer la signature:
+        decypher = pow(s, e, n)
+        decypherHex = str(hex(decypher))
+
+        # Supprimer le padding:
+        while decypherHex[0] != "3":
+            decypherHex = decypherHex[1:]
+
+        try:
+            # Récupérer le hash signé en décodant l'ASN.1:
+            binary_data = binascii.unhexlify(decypherHex)
+            decoded_data, _ = decoder.decode(binary_data)
+            hash_sign = decoded_data["field-1"].prettyPrint()
+
+            # hasher le TBS:
+            hasher = hashes.Hash(self.signAlgo, default_backend())
+            hasher.update(self.tbs)
+            message_hash = hex(int.from_bytes(hasher.finalize(), byteorder='big'))
+
+            # Comparer les hashs:
+            if int(hash_sign, 16) == int(message_hash, 16):
+                self.valid = True
+                return True
+            else:
+                return False
+        except:
+            return False
+        
 
     def checkSign(self, _kpub=None):
         # Récupérer la clé publique du certificat
@@ -103,6 +146,35 @@ class certificat:
 
         return False 
 
+    def checkRevoke(self, _issuerObj=None):
+        if self.ocspUrls == None:
+            return False
+        if _issuerObj == None:
+            return False
+        
+        # Construire une demande OCSP
+        builder = ocsp.OCSPRequestBuilder()
+        builder = builder.add_certificate(self.cert, _issuerObj.cert, self.signAlgo)
+        ocsp_request = builder.build()
+
+        # Envoyer la demande OCSP au serveur OCSP
+        ocsp_response = requests.post(self.ocspUrls, data=ocsp_request.public_bytes(serialization.Encoding.DER),
+                                    headers={'Content-Type': 'application/ocsp-request'})
+
+        # Vérifier la réponse OCSP
+        ocsp_response = ocsp.load_der_ocsp_response(ocsp_response.content)
+
+        if ocsp_response.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL:
+            for response in ocsp_response.responses:
+                print(response)
+                if response == ocsp.OCSPCertStatus.GOOD:
+                    return False
+                elif response == ocsp.OCSPCertStatus.REVOKED:
+                    return True
+        else:
+            return True
+
+        return True
 
     def checkParam(self):
         return_value = True
@@ -124,7 +196,7 @@ class certificat:
                 return_value = False
 
         #ici on vérifie les usages de la clé qui a servi a signer le certificat (la clé ne doit pas servir à signer et à chiffrer à la fois)
-        if self.isCA and ( self.keyUsage == None or not (self.keyUsage.key_encipherment==False and self.keyUsage.data_encipherment==False and self.keyUsage.key_agreement==False and self.keyUsage.key_cert_sign==True and self.keyUsage.crl_sign==True) ):
+        if self.isCA and ( self.keyUsage == None or ((self.keyUsage.key_cert_sign or self.keyUsage.crl_sign) and (self.keyUsage.data_encipherment or self.keyUsage.key_encipherment)) ):
             self.keyUsageValid = False
             self.valid = False
             return_value = False
@@ -132,7 +204,7 @@ class certificat:
             self.keyUsageValid = False
             self.valid = False
             return_value = False
-            
+
         return return_value
 
     def displayJson(self):
@@ -158,6 +230,7 @@ class certificat:
             "format": str(self.format),
             "crt_id": str(self.id),
             "signAlgo": sign_algo_str,
+            "cypherAlgo": str(self.cypherAlgo),
             "sign": sign_hex,
             "dateBefore": date_before_str,
             "dateAfter": date_after_str,
@@ -216,11 +289,24 @@ def initCertif(certificat_format, certificat_path):
         else:
             cert = x509.load_der_x509_certificate(cert_data, default_backend())
 
+        certificat_obj.cert = cert
+
         # Numéro de série
         certificat_obj.id = cert.serial_number
 
         # Algorithme de chiffrement et fonction de hachage
         certificat_obj.signAlgo = cert.signature_hash_algorithm
+
+        # Récupérer l'OID de l'algorithme de signature
+        signature_algorithm_oid = cert.signature_algorithm_oid
+
+        # Vérifier si c'est RSA ou ECDSA
+        if "RSA" in signature_algorithm_oid._name:
+            certificat_obj.cypherAlgo = "RSA"
+        elif "ECDSA" in signature_algorithm_oid._name:
+            certificat_obj.cypherAlgo = "ECDSA"
+        else:
+            certificat_obj.cypherAlgo = "DSA"
 
         # Signature
         certificat_obj.sign = cert.signature
@@ -231,6 +317,17 @@ def initCertif(certificat_format, certificat_path):
         # Dates de validité
         certificat_obj.dateBefore = cert.not_valid_before
         certificat_obj.dateAfter = cert.not_valid_after
+
+        # Récupérer l'extension AIA du certificat s'il existe
+        try:
+            aia_extension = cert.extensions.get_extension_for_oid(x509.ExtensionOID.AUTHORITY_INFORMATION_ACCESS)
+        
+            # Parcourir les descriptions d'URL AIA pour trouver l'URL OCSP
+            for description in aia_extension.value:
+                if description.access_method == x509.AuthorityInformationAccessOID.OCSP:
+                    certificat_obj.ocspUrls = description.access_location.value
+        except:
+            pass
 
         # Subject et Issuer
         certificat_obj.subject = cert.subject
@@ -250,7 +347,8 @@ def initCertif(certificat_format, certificat_path):
                 if ext.value.ca:
                     certificat_obj.isCA = True
 
-    except:
+    except Exception as e:
+        print(e)
         return None
     
     return certificat_obj

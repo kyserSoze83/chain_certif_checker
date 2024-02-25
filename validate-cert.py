@@ -32,9 +32,10 @@ def main():
             displayError("Certificat format is invalid...")
         else:
             # Vérifier la signature du certificat:
-            if certificat_obj.checkSign():
-                # Vérifier les paramètres du certificat:
-                certificat_obj.checkParam()
+            certificat_obj.checkSign()
+            
+            # Vérifier les paramètres du certificat:
+            certificat_obj.checkParam()
 
             # Renvoyer le résultat de notre vérification au format JSON:
             certificat_obj.displayJson()
