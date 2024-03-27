@@ -1,5 +1,5 @@
 #
-#   File: validate-cert.py
+#   File: vclib.py
 #   Author: Jean-Baptiste Relave & Nabil Sarhiri
 #   Date : 16/02/2024
 #
@@ -11,19 +11,40 @@ import requests
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import utils
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography import x509 
+from cryptography.x509 import CertificateRevocationList
+from cryptography.x509.oid import ExtensionOID
 from cryptography.x509 import ocsp
+from cryptography.x509 import load_der_x509_crl, load_pem_x509_crl
 from datetime import datetime
 from pyasn1.codec.der import decoder
+from pyasn1.type.univ import ObjectIdentifier
+from pyasn1.codec.der import decoder
+from pyasn1.type.univ import Sequence
+#from pyasn1.modules import rfc5480
+from pyasn1.type import univ, namedtype
+from ecdsa import VerifyingKey, curves, NIST256p, NIST384p, NIST521p, ellipticcurve, numbertheory
+from ecdsa.util import sigdecode_der
+
+import subprocess
+import re
 import binascii
+
+class ECDSASignature(univ.Sequence):
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType('r', univ.Integer()),
+        namedtype.NamedType('s', univ.Integer())
+    )
 
 # ----------------- Class -----------------
 class chain:
-    def __init__(self, _certs):
+    def __init__(self, _certs, _forceIsValide):
         self.certs = _certs
         self.isValid = False
+        self.forceIsValide = _forceIsValide
 
     def checkChain(self):
         # Vérifier la validité de la chaîne
@@ -37,14 +58,16 @@ class chain:
     def displayJson(self):
         chain_json = {
             "id": 1,
-            "valid": str(self.isValid),
+            "valid": str(self.isValid and not self.forceIsValide),
         }
 
         chain_json_str = json.dumps(chain_json, indent=4)
-        print(chain_json_str)
+        return chain_json_str
 
 class certificat:
     def __init__(self, _format, _path):
+        _path = _path.replace("\\", "/")
+        self.fileName = "".join(_path.split("/")[-1].split("__RNDCERTNAME__")[1:])
         self.cert = None
         self.format = _format
         self.path = _path
@@ -67,8 +90,69 @@ class certificat:
         self.isCA = False
         self.valid = False
 
+    def getId(self):
+        return self.id
+
     def checkSignEC(self, _kpub=None):
-        return False
+        if _kpub==None:
+            public_key=self.kpub
+        else:
+            public_key=_kpub
+        
+        
+        # yQ=self.kpub.y
+        # gen= courbe.generator
+        curve_name=public_key.curve.name
+       
+        # Faites le mapping entre le nom de la courbe de 'cryptography' et les objets de courbe dans 'ecdsa'
+        curve_mapping = {
+            'secp192r1': curves.NIST192p,
+            'secp224r1': curves.NIST224p,
+            'secp256r1': curves.NIST256p,
+            'secp384r1': curves.NIST384p,
+            'secp521r1': curves.NIST521p,
+            'secp112r1': curves.SECP112r1,
+            'secp112r2': curves.SECP112r2,
+            'secp128r1': curves.SECP128r1,
+            'secp160r1': curves.SECP160r1,
+            'secp256k1': curves.SECP256k1,
+            'brainpoolP160r1': curves.BRAINPOOLP160r1,
+            'brainpoolP192r1': curves.BRAINPOOLP192r1,
+            'brainpoolP224r1': curves.BRAINPOOLP224r1,
+            'brainpoolP256r1': curves.BRAINPOOLP256r1,
+            'brainpoolP320r1': curves.BRAINPOOLP320r1,
+            'brainpoolP512r1': curves.BRAINPOOLP512r1,
+            'brainpoolP320r1': curves.BRAINPOOLP320r1,
+        }
+        ecdsa_curve = curve_mapping.get(curve_name.lower())
+        if ecdsa_curve is None:
+                raise ValueError(f"Unsupported curve: {curve_name}")
+
+        g = ecdsa_curve.generator
+        n= ecdsa_curve.order
+        q=public_key.public_numbers()
+        pub_points_ecdsa=VerifyingKey.from_public_point(
+            ellipticcurve.Point(ecdsa_curve.curve, q.x, q.y),
+            curve=ecdsa_curve
+            )
+        q2=pub_points_ecdsa.pubkey.point
+
+
+        r,s=sigdecode_der(self.sign, ecdsa_curve.order)
+
+        # hasher le TBS:
+        hasher = hashes.Hash(self.signAlgo, default_backend())
+        hasher.update(self.tbs)
+        message_hash = hasher.finalize()
+        message_hash=int.from_bytes(message_hash, byteorder='big')
+
+        u1=(message_hash*pow(s, -1, n))%n
+        u2=(r*pow(s, -1, n))%n
+        p=u1*g+u2*q2
+        # bigp=p%n
+
+        if (p.x() - r) % n == 0:
+            self.valid=True
 
     def checkSignRSA(self, _kpub=None):
         # Récupérer la clé publique du certificat:
@@ -166,14 +250,13 @@ class certificat:
 
         if ocsp_response.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL:
             for response in ocsp_response.responses:
-                print(response)
                 if response == ocsp.OCSPCertStatus.GOOD:
                     return False
                 elif response == ocsp.OCSPCertStatus.REVOKED:
                     return True
         else:
             return True
-
+ 
         return True
 
     def checkParam(self):
@@ -227,6 +310,7 @@ class certificat:
 
         cert_json = {
             "id": 0,
+            "file_name": str(self.fileName),
             "format": str(self.format),
             "crt_id": str(self.id),
             "signAlgo": sign_algo_str,
@@ -247,12 +331,46 @@ class certificat:
         }
 
         cert_json_str = json.dumps(cert_json, indent=4)
-        print(cert_json_str)
+        return cert_json_str
 
 
 # ----------------- Functions -----------------
-def initChain(certs):
-    return chain(certs)
+        
+def mod_inverse(x,m):
+    for n in range(m):
+        if (x * n) % m == 1:
+            return n
+            break
+
+        elif n == m - 1:
+            return "Null"
+        else:
+            continue
+
+def extraire_coordonnees_xy(hex_octets):
+        # Convertir la chaîne d'octets hexadécimaux en une liste d'octets
+        octets = bytes.fromhex(hex_octets)
+
+        # Sauter le premier octet (0x04 pour un point non compressé)
+        octets_sans_prefixe = octets[1:]
+
+        # Séparer la liste en deux parties égales pour x et y
+        longueur = len(octets_sans_prefixe) // 2
+        x = octets_sans_prefixe[:longueur]
+        y = octets_sans_prefixe[longueur:]
+
+        return x, y
+
+# def parse_ecdsa_signature(signature_bytes):
+#     # Decode ASN.1 DER encoded signature
+#     signature, _ = decoder.decode(signature_bytes, asn1Spec=ECDSASignature())
+#     r = int(signature[0])
+#     s = int(signature[1])
+#     return r, s
+
+
+def initChain(certs, forceIsValid):
+    return chain(certs, forceIsValid)
 
 def checkArgs():
     if len(sys.argv)-1 <3:
@@ -348,7 +466,50 @@ def initCertif(certificat_format, certificat_path):
                     certificat_obj.isCA = True
 
     except Exception as e:
-        print(e)
         return None
     
     return certificat_obj
+
+def is_certificate_not_revoked(cert):
+        # Charger le certificat
+        crl_path="./liste_revocation.pem"
+        # Charger la CRL
+        with open(crl_path, 'rb') as crl_file:
+            crl_data = crl_file.read()
+            try:
+                crl = load_pem_x509_crl(crl_data, default_backend())
+            except ValueError:
+            # Si le chargement en tant que PEM échoue, essayez de charger en tant que DER
+                crl = load_der_x509_crl(crl_data, default_backend())
+        # Vérifier si le certificat est révoqué
+        revoked_cert = crl.get_revoked_certificate_by_serial_number(cert.id)
+        if revoked_cert is not None:
+            return False
+        else:
+            return True
+
+def is_not_revoked(cert_path,cert_child):
+    not_revoked=False
+    with open(cert_path, 'rb') as cert_file:
+        cert_data = cert_file.read()
+        cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+    output_filename="liste_revocation.pem"
+    try:
+        crl_distribution_points = cert.extensions.get_extension_for_oid(ExtensionOID.CRL_DISTRIBUTION_POINTS).value
+        if crl_distribution_points:
+            for url in crl_distribution_points:
+                crl_url = url.full_name[0].value
+                #crl_url = crl_distribution_points[0].full_name[0].value
+                # Téléchargement de la CRL
+                response = requests.get(crl_url)
+                if response.status_code == 200:
+                    with open(output_filename, 'wb') as output_file:
+                        output_file.write(response.content)
+                    if is_certificate_not_revoked(cert_child):
+                        not_revoked=True
+                        return not_revoked
+                    else:
+                        cert_child.revoked=True
+        return not_revoked
+    except:
+        pass

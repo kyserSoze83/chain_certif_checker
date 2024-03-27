@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>validate-cert</title>
     <link rel="stylesheet" href="style.css">
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script async src="script.js"></script>
 </head>
 <body>
     <h1 id="title">Certificate Validator</h1>
@@ -13,66 +15,12 @@
 
     <form id="uploadForm" enctype="multipart/form-data">
         <span id="file_name"></span><br/>
-        <input type="file" id="input_file" name="certificat_input" accept=".cert, .crt, .pem" style="display: none;" onchange="displayFileName()" />
+        <input type="file" id="input_file" name="certificat_input" accept=".cert, .crt, .pem" style="display: none;" onchange="displayFileName()" multiple />
         <input type="button" value="Load a certificate" onclick="document.getElementById('input_file').click();" />
-        <input type="submit" id="submit_button" name="upload_file" value="Envoyer">
+        <input type="button" id="submit_button" name="upload_file" value="Envoyer" onclick="sendToServer()">
     </form>
     
-    <script>
-        function displayFileName() {
-            var fileName = $('#input_file').prop('files')[0].name;
-            $('#file_name').text(fileName).show();
-        }
-    </script>
-    
-
-    <div id="resultat">
-        <table>
-            <thead>
-              <tr>
-                <th scope="col">Attribut</th>
-                <th scope="col">Value</th>
-              </tr>
-            </thead>
-            <tbody id="tbody_values">
-            </tbody>
-          </table>          
-    </div>
-
-    <script>
-        $(document).ready(function(){
-            $('#uploadForm').submit(function(e){
-                e.preventDefault(); // Empêche le rechargement de la page
-
-                var formData = new FormData(this);
-                
-                $.ajax({
-                    url: '/valid_cert',
-                    type: 'POST',
-                    data: formData,
-                    contentType: false,
-                    processData: false,
-                    success: function(response){
-                        var jsonData = JSON.parse(response);
-
-                        console.log(jsonData);
-
-                        $('#tbody_values').empty();
-                        $('#resultat').css('display', 'block');
-
-                        $.each(jsonData, function(key, value) {
-                            if (key != 'id' && key != 'format') {
-                                $('#tbody_values').append('<tr><th scope="row">' + key + '</th><td>' + value + '</td></tr>');
-                            }
-                        });
-                    },
-                    error: function(xhr, status, error){
-                        console.error(error);
-                    }
-                });
-            });
-        });
-    </script>
+    <div id="cert_chain"></div>
     
     <footer>
         <p>©Nabil & Jb, 2024</p>

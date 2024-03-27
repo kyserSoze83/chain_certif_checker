@@ -7,23 +7,37 @@
 import vclib
 import json
 
-def displayError(msg):
+finalJson = ""
+
+def displayError(id, msg):
+    global finalJson
+
     output_json = {
         "id": -1,
+        "certId": str(id),
         "message": msg
     }
 
     output_json_str = json.dumps(output_json)
-    print(output_json_str)
+    finalJson += (output_json_str + ',')
+
+def displayJson():
+    global finalJson
+
+    if finalJson[-1] == ',':
+        finalJson = finalJson[:-1]
+    print(finalJson)
 
 def main():
+    global finalJson
+
     # Vérifier les arguments et récupérer le format des certificats et les chemins vers les fichiers:
     certificats_args = vclib.checkArgs()
     certs = []
     invalid_chain = False
     
     if certificats_args == -1:
-        displayError("Invalid arguments")
+        displayError(None, "Invalid arguments")
     else:
         certificat_format = certificats_args[0]
         certificats_paths = certificats_args[1:]
@@ -34,9 +48,9 @@ def main():
             certificat_obj = vclib.initCertif(certificat_format, cert_path) # Générer un objet certificat
 
             if certificat_obj == None:
-                displayError(f"({cert_path}) Certificat format is invalid...")
+                displayError(cert_path, f"Certificat format is invalid...")
                 invalid_chain = True
-                break
+                return
             else:
                 # Vérifier la signature du certificat:
                 check_sign_result = False
@@ -46,38 +60,42 @@ def main():
                 elif certificat_obj.cypherAlgo == "ECDSA":
                     check_sign_result = certificat_obj.checkSignEC(last_ca_kpub)
                 elif certificat_obj.cypherAlgo == "DSA":
-                    displayError(f"({cert_path}) DSA is not supported...")
+                    displayError(certificat_obj.getId() or cert_path, f"DSA is not supported...")
                     invalid_chain = True
-                    break
+                    #break
 
                 if check_sign_result:
                     # Vérifier les paramètres du certificat:
                     if not certificat_obj.checkParam():
-                        displayError(f"({cert_path}) Certificat parameters are invalid...")
+                        displayError(certificat_obj.getId() or cert_path, f"Certificat parameters are invalid...")
                         invalid_chain = True
-                        break
+                        #break
                     else:
-                        if last_issuer != None and certificat_obj.checkRevoke(last_issuer):
-                            displayError(f"({cert_path}) Certificat is revoked...")
-                            invalid_chain = True
-                            break
+                        if last_issuer != None and last_issuer.autoSign==False:
+                            if not vclib.is_not_revoked(last_issuer.path, certificat_obj): 
+                                displayError(certificat_obj.getId() or cert_path, f"Certificat is revoked...")
+                                invalid_chain = True
                         else:
                             if certificat_obj.isCA:
                                 last_issuer = certificat_obj
                                 last_ca_kpub = certificat_obj.kpub
                             certs.append(certificat_obj)
                 else:
-                    displayError(f"({cert_path}) Certificat signature is invalid...")
+                    displayError(certificat_obj.getId() or cert_path, f"Certificat signature is invalid...")
                     invalid_chain = True
-                    break
+                    #break
+            finalJson += (certificat_obj.displayJson() + ',')
 
-        if not invalid_chain:
-            chain_obj = vclib.initChain(certs)
-            if chain_obj == None:
-                displayError("Chain is invalid...")
-            else:
-                chain_obj.checkChain()
-                chain_obj.displayJson()
+        # if not invalid_chain:
+        chain_obj = vclib.initChain(certs, invalid_chain)
+        if chain_obj == None:
+            displayError(None, "Chain is invalid...")
+        else:
+            chain_obj.checkChain()
+            finalJson += (chain_obj.displayJson() + ',')
 
 if __name__ == '__main__':
+    print("[")
     main()
+    displayJson()
+    print("]")
