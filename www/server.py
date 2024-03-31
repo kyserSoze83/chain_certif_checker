@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_from_directory, request, json
+from flask import Flask, render_template, send_from_directory, request, json, jsonify
 import os
 import subprocess
 import secrets
@@ -7,7 +7,7 @@ from urllib.parse import unquote
 
 app = Flask(__name__, template_folder=os.path.dirname(os.path.realpath(__file__)))
 
-pythonV = "python"
+pythonV = "python3"
 
 @app.route('/')
 def index():
@@ -35,7 +35,9 @@ def valid_cert():
     # Spécifiez le chemin complet du script et le chemin complet du répertoire des certificats
     script_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "validate-cert-chain.py")
 
-    certificats_paths_str = " ".join(certificats_paths)
+    certificats_paths_str = ""#.join(certificats_paths)
+    for certificat in certificats_paths:
+        certificats_paths_str+='"'+certificat+'" '
     print(certificats_paths_str)
     commande = f"{pythonV} {script_path} -format PEM {certificats_paths_str}"
     
@@ -56,4 +58,4 @@ def serve_static(filename):
     return send_from_directory(os.path.join(os.path.dirname(os.path.realpath(__file__))), filename)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
