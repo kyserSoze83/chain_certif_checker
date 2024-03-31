@@ -7,7 +7,7 @@ from urllib.parse import unquote
 
 app = Flask(__name__, template_folder=os.path.dirname(os.path.realpath(__file__)))
 
-pythonV = "python3"
+pythonV = "python"
 
 @app.route('/')
 def index():

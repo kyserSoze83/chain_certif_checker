@@ -10,7 +10,7 @@ ADD ./requirements.txt ./requirements.txt
 
 RUN mkdir ./certs
 
-RUN chmod 777 -R ./certs
+RUN chmod 777 ./certs
 
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
