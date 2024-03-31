@@ -1,0 +1,108 @@
+:root {
+    --bg: rgb(105, 105, 234);
+}
+
+html,
+body {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg);
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+}
+
+#title {
+    margin-top: 150px;
+    font-size: 35pt;
+}
+
+#description {
+    color: rgb(210, 212, 255);
+    font-size: 13pt;
+    margin-top: -20px;
+    margin-bottom: 75px;
+}
+
+footer {
+    position: fixed;
+    left: 0;
+    bottom: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+input {
+    font-family: Arial, Helvetica, sans-serif;
+    border: none;
+    background-color: rgba(101, 67, 188, 0.583);
+    color: rgb(185, 188, 255);
+    padding: 15px;
+    border-radius: 15px;
+}
+
+input[type="button"], input[type="submit"] {
+    margin-top: 20px;
+    font-size: 12pt;
+    cursor: pointer;
+    border: 2px solid rgba(148, 151, 255, 0.807);
+}
+
+input[type="button"]:hover {
+    box-shadow: 0em 0em 1em rgba(148, 151, 255, 0.807);
+}
+
+#file_name{
+    font-size: 12pt;
+    color: rgba(207, 209, 255, 0.807);
+    background-color: rgb(97, 93, 219);
+    padding: 15px; 
+    border-radius: 10px;
+    display: none;
+}
+
+.resultat{
+    width: 30%;
+    display: none;
+    margin-left: 5%;
+}
+
+.resultat table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 2px solid rgb(140 140 140);
+    font-family: sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.resultat thead {
+    background-color: rgb(62, 37, 144);
+}
+
+.resultat th,
+.resultat td {
+    border: 1px solid rgb(101, 112, 230);
+    padding: 8px 10px;
+    text-align: left;
+}
+
+.resultat td{
+    word-break: break-all;
+}
+
+.resultat tbody>tr:nth-of-type(even) {
+    background-color: rgb(91, 91, 213);
+}
+
+#cert_chain{
+    margin-top: 75px;
+    display: flex;
+    width: 80%;
+    margin-left: 10%;
+}
